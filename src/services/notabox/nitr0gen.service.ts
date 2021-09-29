@@ -47,7 +47,7 @@ export class Nitr0genService {
   public async passthrough(
     url: string,
     ntx: object
-  ): Promise<{ id: string; notaId: string; address: string }> {
+  ): Promise<{ id: string; nId: string; address: string }> {
     const safentx = Buffer.from(JSON.stringify(ntx)).toString("base64");
     const payload = {
       ntx: safentx,
@@ -61,26 +61,6 @@ export class Nitr0genService {
     }
   }
 
-  public async onboard(
-    otpk: string,
-    ntx: object
-  ): Promise<{ id: string; notaId: string }> {
-    const safentx = Buffer.from(JSON.stringify(ntx)).toString("base64");
-    const payload = {
-      otpk,
-      ntx: safentx,
-    };
-
-    try {
-      const response = (await this.send("user/onboard", payload)) as {
-        id: string;
-        notaId: string;
-      };
-      return response;
-    } catch (e) {
-      throw e;
-    }
-  }
 
 
   public async getIdentity(

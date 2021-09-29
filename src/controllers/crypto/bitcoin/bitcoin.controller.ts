@@ -1,9 +1,9 @@
 import { Body, Controller, Post, UseGuards, Get, Param } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
-import { AuthGuard } from '@nestjs/passport';
 import { ApiTags } from '@nestjs/swagger';
 //import { Permissions } from '../../../decorators/permissions.decorator';
 import { lastValueFrom } from 'rxjs/internal/lastValueFrom';
+import { AuthGuard } from '../../../guards/auth.guard';
 
 @ApiTags('Crypto / Bitcoin')
 @Controller('bitcoin')
@@ -20,6 +20,7 @@ export class BitcoinController {
     }
   }
 
+  @UseGuards(AuthGuard)
   @Post(':network/create')
   async fee(
     @Param('network') network: string,
@@ -91,6 +92,7 @@ export class BitcoinController {
     return response;
   }
 
+  @UseGuards(AuthGuard)
   @Post(':network/send')
   //@Permissions('create:items')
   async sendToNetwork(
@@ -105,6 +107,7 @@ export class BitcoinController {
     return response.data;
   }
 
+  @UseGuards(AuthGuard)
   @Get(':network/:address')
   async wallet(
     @Param('network') network: string,

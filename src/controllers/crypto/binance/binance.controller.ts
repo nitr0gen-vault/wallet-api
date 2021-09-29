@@ -1,8 +1,8 @@
 import { Body, Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
-import { AuthGuard } from "@nestjs/passport";
 import { Contract, getDefaultProvider, providers, utils } from "ethers";
 import { BscscanProvider } from "@ethers-ancillary/bsc";
 import { ApiTags } from "@nestjs/swagger";
+import { AuthGuard } from '../../../guards/auth.guard';
 
 @ApiTags("Crypto / Binance")
 @Controller("binance")
@@ -91,7 +91,10 @@ export class BinanceController {
     switch (network) {
       default:
       case "main":
-        throw Error("Not Implemented");
+        return new BscscanProvider(
+          "bsc-mainnet",
+          "1WHSJ9YY13XZ9ESWJK7PFGA8QN33NJ2XVM"
+        );
       case "test":
         return new BscscanProvider(
           "bsc-testnet",
@@ -104,6 +107,7 @@ export class BinanceController {
     // );
   }
 
+  @UseGuards(AuthGuard)
   @Get(":network/fee")
   async gas(@Param("network") network: string): Promise<BinanceGasPrice> {
     const provider = this.getProvider(network);
@@ -111,11 +115,12 @@ export class BinanceController {
 
     return {
       low: price,
-      medium: price * 1.8, // 1.5 not good for transfer (must be some gas to size ratio)
-      high: price * 2,
+      medium: Math.floor(price * 1.8), // 1.5 not good for transfer (must be some gas to size ratio)
+      high: Math.floor(price * 2),
     };
   }
 
+  @UseGuards(AuthGuard)
   @Post(":network/send")
   async sendToNetwork(
     @Param("network") network: string,
@@ -132,6 +137,7 @@ export class BinanceController {
     }
   }
 
+  @UseGuards(AuthGuard)
   @Get(":network/:address")
   async wallet(
     @Param("network") network: string,

@@ -1,8 +1,8 @@
 import { Body, Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
-import { AuthGuard } from "@nestjs/passport";
 import { ApiTags } from "@nestjs/swagger";
 import * as tron from "tronweb";
 import { utils } from "ethers";
+import { AuthGuard } from '../../../guards/auth.guard';
 
 @ApiTags("Crypto / Tron")
 @Controller("tron")
@@ -88,6 +88,7 @@ export class TronController {
     return tronWeb;
   }
 
+  @UseGuards(AuthGuard)
   @Post(":network/create")
   async fee(
     @Param("network") network: string,
@@ -99,6 +100,7 @@ export class TronController {
     return await tronWeb.transactionBuilder.sendTrx(to, amount, from);
   }
 
+  @UseGuards(AuthGuard)
   @Post(":network/create/trc20")
   async trc20(
     @Param("network") network: string,
@@ -128,20 +130,10 @@ export class TronController {
       ]
     );
 
-    console.log([
-      {
-        type: "address",
-        value: to,
-      },
-      {
-        type: "uint256",
-        value: amount,
-      },
-    ]);
-
     return tx.transaction;
   }
 
+  @UseGuards(AuthGuard)
   @Post(":network/send")
   //@Permissions('create:items')
   async sendToNetwork(
@@ -152,6 +144,7 @@ export class TronController {
     return tronWeb.trx.sendRawTransaction(tx);
   }
 
+  @UseGuards(AuthGuard)
   @Get(":network/:address")
   async wallet(
     @Param("network") network: string,
@@ -209,8 +202,6 @@ export class TronController {
       const tokens = [];
       for (let i = TronController.supportedTRC20Tokens.length; i--; ) {
         const trc20 = TronController.supportedTRC20Tokens[i];
-
-        console.log(trc20);
         tokens.push({
           name: trc20.name,
           symbol: trc20.symbol,

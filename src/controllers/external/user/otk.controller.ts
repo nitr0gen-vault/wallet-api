@@ -5,36 +5,55 @@ import {
   Put,
   Request,
   Get,
+  UseGuards,
 } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
+import { InjectRepository } from "@nestjs/typeorm";
+import { User } from "../../../entities/user.entity";
+import { Repository } from "typeorm";
+import { AuthGuard } from "../../../guards/auth.guard";
 import { Nitr0genService } from "../../../services/notabox/nitr0gen.service";
 
 @ApiTags("One Time Key")
 @Controller("otk")
 export class OtkController {
-  constructor(private nota: Nitr0genService) {}
+  constructor(
+    @InjectRepository(User)
+    private usersRepository: Repository<User>,
+    private nota: Nitr0genService
+  ) {}
 
   @Post()
-  //@Permissions('appy:create:users')
-  async onboard(@Body("ntx") ntx: object): Promise<any> {
+  async onboard(@Body("ntx") ntx: any): Promise<any> {    
     const nota = await this.nota.passthrough("user/onboard", ntx);
+    const now = new Date();
+
+    await this.usersRepository.save(
+      this.usersRepository.create({
+        nId: nota.nId,
+        uuid: ntx.$tx.$i.otk.uuid,
+        email: "",
+        telephone: "",
+        otpk: [ntx.$tx.$i.otk.publicKey],
+        lastOtpk: ntx.$tx.$i.otk.publicKey,
+        created: now,
+        updated: now,
+      })
+    );
+
     return nota;
   }
 
   @Post("recovery")
-  async recovery(
-    @Body("ntx") ntx: any,
-    @Request() req: any
-  ): Promise<any> {
+  @UseGuards(AuthGuard)
+  async recovery(@Body("ntx") ntx: any, @Request() req: any): Promise<any> {
     const nota = await this.nota.passthrough("user/recovery", ntx);
     return nota;
   }
 
   @Post("security")
-  async security(
-    @Body("ntx") ntx: any,
-    @Request() req: any
-  ): Promise<any> {
+  @UseGuards(AuthGuard)
+  async security(@Body("ntx") ntx: any, @Request() req: any): Promise<any> {
     const nota = await this.nota.passthrough("user/recovery", ntx);
     return nota;
   }

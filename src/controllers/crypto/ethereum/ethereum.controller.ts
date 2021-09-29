@@ -1,7 +1,7 @@
 import { Body, Controller, Post, UseGuards, Get, Param } from "@nestjs/common";
-import { AuthGuard } from "@nestjs/passport";
 import { ApiTags } from "@nestjs/swagger";
 import { Contract, providers, utils } from "ethers";
+import { AuthGuard } from '../../../guards/auth.guard';
 
 @ApiTags("Crypto / Etheruem")
 @Controller("ethereum")
@@ -83,7 +83,10 @@ export class EthereumController {
     switch (network) {
       default:
       case "main":
-        throw Error("Not Implemented");
+        return new providers.EtherscanProvider(
+          "homestead",
+          "R6BJBUE5TX9WNR4X5BSRZCGA3BID3EUDBY"
+        );
       case "test":
         return new providers.EtherscanProvider(
           "ropsten",
@@ -92,6 +95,7 @@ export class EthereumController {
     }
   }
 
+  @UseGuards(AuthGuard)
   @Get(":network/fee")
   async fee(@Param("network") network: string): Promise<EthereumGasPrice> {
     const provider = this.getProvider(network);
@@ -99,11 +103,12 @@ export class EthereumController {
 
     return {
       low: price,
-      medium: price * 1.5,
-      high: price * 1.8,
+      medium: Math.floor(price * 1.5),
+      high: Math.floor(price * 1.8),
     };
   }
 
+  @UseGuards(AuthGuard)
   @Post(":network/send")
   //@Permissions('create:items')
   async sendToNetwork(
@@ -121,6 +126,7 @@ export class EthereumController {
     }
   }
 
+  @UseGuards(AuthGuard)
   @Get(":network/:address")
   async wallet(
     @Param("network") network: "main" | "test",
