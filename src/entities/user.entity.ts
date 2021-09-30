@@ -31,6 +31,9 @@ export class User {
   telephone: string;
 
   @Column()
+  pairing: any;
+
+  @Column()
   otpk: string[];
 
   @Column()

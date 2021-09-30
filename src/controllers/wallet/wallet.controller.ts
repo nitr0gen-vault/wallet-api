@@ -72,6 +72,7 @@ export class WalletController {
 
     // TODO Improve security, When doing preflights monitor and match on uuid or provide otk signature
     // without that the user settings/public wallet can be exposed from brute forcing uuids
+    // There is 2 types of wallet profile moving this done via social recovery and otpk pending
 
     // Find User
     const users = await this.UserRepository.find({ where: { uuid } });
