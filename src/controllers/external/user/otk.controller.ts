@@ -45,6 +45,20 @@ export class OtkController {
     return nota;
   }
 
+  @Post("uuid")
+  @UseGuards(AuthGuard)
+  async uuid(@Body("uuid") uuid: any): Promise<{ nId: string }> {
+    const users = await this.usersRepository.find({ where: { uuid } });
+    if (users.length) {
+      return {
+        nId: users[0].nId,
+      };
+    }
+    return {
+      nId: null,
+    };
+  }
+
   @Post("recovery")
   @UseGuards(AuthGuard)
   async recovery(@Body("ntx") ntx: any, @Request() req: any): Promise<any> {

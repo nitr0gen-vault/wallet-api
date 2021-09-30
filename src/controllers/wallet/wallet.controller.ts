@@ -12,6 +12,8 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { Key } from "../../entities/key.entity";
 import { Repository } from "typeorm";
 import { AuthGuard } from "../../guards/auth.guard";
+import { Wallet } from "@ethersproject/wallet";
+import { User } from "../../entities/user.entity";
 
 @ApiTags("Wallet")
 @Controller("wallet")
@@ -19,6 +21,8 @@ export class WalletController {
   constructor(
     @InjectRepository(Key)
     private KeyRepository: Repository<Key>,
+    @InjectRepository(User)
+    private UserRepository: Repository<User>,
     private ntx: Nitr0genService
   ) {}
 
@@ -57,6 +61,25 @@ export class WalletController {
       },
       hashes: response.hashes,
     };
+  }
+
+  @UseGuards(AuthGuard)
+  @Post("cache")
+  //@Permissions('appy:create:users')
+  async cache(@Body("uuid") uuid: object): Promise<Key[]> {
+    // Find User
+    const users = await this.UserRepository.find({ where: { uuid } });
+
+    if (users.length) {
+      const user = users[0];
+      // Get keys from his id
+      const keys = await this.KeyRepository.find({
+        where: { userId: user.id },
+      });
+      return keys;
+    } else {
+      return [];
+    }
   }
 
   @Post("preflight")
