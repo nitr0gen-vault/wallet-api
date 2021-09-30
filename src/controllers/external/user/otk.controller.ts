@@ -24,7 +24,7 @@ export class OtkController {
   ) {}
 
   @Post()
-  async onboard(@Body("ntx") ntx: any): Promise<any> {    
+  async onboard(@Body("ntx") ntx: any, @Body("pnt") pnt = ""): Promise<any> {
     const nota = await this.nota.passthrough("user/onboard", ntx);
     const now = new Date();
 
@@ -32,6 +32,7 @@ export class OtkController {
       this.usersRepository.create({
         nId: nota.nId,
         uuid: ntx.$tx.$i.otk.uuid,
+        pnt,
         email: "",
         telephone: "",
         otpk: [ntx.$tx.$i.otk.publicKey],

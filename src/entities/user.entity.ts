@@ -15,6 +15,10 @@ export class User {
 
   @Index()
   @Column()
+  pnt: string;
+
+  @Index()
+  @Column()
   email: string;
 
   @Column()
