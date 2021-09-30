@@ -66,7 +66,13 @@ export class WalletController {
   @UseGuards(AuthGuard)
   @Post("cache")
   //@Permissions('appy:create:users')
-  async cache(@Body("uuid") uuid: object): Promise<Key[]> {
+  async cache(
+    @Body("uuid") uuid: object
+  ): Promise<{ keys: Key[]; settings: any }> {
+
+    // TODO Improve security, When doing preflights monitor and match on uuid or provide otk signature
+    // without that the user settings/public wallet can be exposed from brute forcing uuids
+
     // Find User
     const users = await this.UserRepository.find({ where: { uuid } });
 
@@ -76,9 +82,20 @@ export class WalletController {
       const keys = await this.KeyRepository.find({
         where: { userId: user.id },
       });
-      return keys;
+      return {
+        keys,
+        settings: {
+          security: user.security,
+          email: user.email,
+          recovery: user.recovery,
+          telephone: user.telephone,
+        },
+      };
     } else {
-      return [];
+      return {
+        keys: [],
+        settings: [],
+      };
     }
   }
 

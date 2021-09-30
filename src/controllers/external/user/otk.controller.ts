@@ -70,6 +70,33 @@ export class OtkController {
   @UseGuards(AuthGuard)
   async security(@Body("ntx") ntx: any, @Request() req: any): Promise<any> {
     const nota = await this.nota.passthrough("user/recovery", ntx);
+
+    let updated = false;
+    switch (ntx.$tx.$entry) {
+      case "update.security":
+        req.user.security = ntx.$tx.$i.otk.security;
+        updated = true;
+        break;
+      case "update.email":
+        req.user.email = ntx.$tx.$i.otk.email;
+        updated = true;
+        break;
+      case "update.recovery":
+        req.user.recovery = ntx.$tx.$i.otk.recovery;
+        updated = true;
+        break;
+      case "update.telephone":
+        req.user.telephone = ntx.$tx.$i.otk.telephone;
+        updated = true;
+        break;
+    }
+
+    if (updated) {
+      console.log("updating user");
+      console.log(req.user);
+      await this.usersRepository.save(req.user);
+    }
+
     return nota;
   }
 }

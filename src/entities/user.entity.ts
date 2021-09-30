@@ -19,7 +19,13 @@ export class User {
 
   @Index()
   @Column()
-  email: string;
+  email: string;  
+
+  @Column()
+  recovery: string;
+
+  @Column()
+  security: any;
 
   @Column()
   telephone: string;
