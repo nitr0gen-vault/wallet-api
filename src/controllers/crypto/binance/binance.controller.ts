@@ -170,7 +170,7 @@ export class BinanceController {
     };
 
     const wallet = await this.KeyRepository.find({ where: { address } });
-    if (wallet.length) {
+    if (wallet.length && wallet[0].tokens) {
       for (let i = wallet[0].tokens.length; i--; ) {
         //const bep20 = BinanceController.defaultSupportedBEP20Tokens[i];
         const bep20 = wallet[0].tokens[i];

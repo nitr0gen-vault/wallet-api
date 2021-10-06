@@ -100,6 +100,39 @@ export class WalletController {
   }
 
   @UseGuards(AuthGuard)
+  @Post("token")
+  //@Permissions('appy:create:users')
+  async addToken(
+    @Body("token")
+    tokenData: {
+      symbol: string;
+      name: string;
+      decimal: number;
+      address: string;
+    },
+    @Body("key") key: string,
+    @Request() req: any
+  ): Promise<Token> {
+    // Generate New
+    const keys = await this.KeyRepository.find({ where: { address: key } });
+
+    if (keys.length) {
+      const keyData = keys[0];
+      const token: Token = {
+        name: tokenData.name,
+        symbol: tokenData.symbol,
+        decimal: tokenData.decimal,
+        contract: tokenData.address,
+        network: "main",
+      }
+      keyData.tokens.push(token);
+      await this.KeyRepository.save(keyData);
+      return token;
+    }
+    throw new Error("Token not added");
+  }
+
+  @UseGuards(AuthGuard)
   @Post("cache")
   //@Permissions('appy:create:users')
   async cache(

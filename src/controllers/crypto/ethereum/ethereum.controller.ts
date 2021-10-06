@@ -157,7 +157,7 @@ export class EthereumController {
 
     const wallet = await this.KeyRepository.find({ where: { address } });
     console.log(wallet);
-    if (wallet.length) {
+    if (wallet.length && wallet[0].tokens) {
       for (let i = wallet[0].tokens.length; i--; ) {
         //const erc20 = EthereumController.defaultSupportedTestERC20Tokens[i];
         const erc20 = wallet[0].tokens[i];
