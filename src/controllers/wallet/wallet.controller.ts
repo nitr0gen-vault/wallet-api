@@ -9,11 +9,14 @@ import {
 import { Nitr0genService } from "../../services/notabox/nitr0gen.service";
 import { ApiTags } from "@nestjs/swagger";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Key } from "../../entities/key.entity";
+import { Key, Token } from "../../entities/key.entity";
 import { Repository } from "typeorm";
 import { AuthGuard } from "../../guards/auth.guard";
 import { Wallet } from "@ethersproject/wallet";
 import { User } from "../../entities/user.entity";
+import { EthereumController } from "../crypto/ethereum/ethereum.controller";
+import { BinanceController } from "../crypto/binance/binance.controller";
+import { TronController } from "../crypto/tron/tron.controller";
 
 @ApiTags("Wallet")
 @Controller("wallet")
@@ -39,6 +42,7 @@ export class WalletController {
     @Request() req: any
   ): Promise<{
     key: any;
+    tokens: Token[];
     hashes: string[];
   }> {
     // Generate New
@@ -51,14 +55,46 @@ export class WalletController {
     key.address = response.address;
     key.created = key.updated = new Date();
     key.userId = req.user.id;
-    await this.KeyRepository.insert(key);
+    key.hashes = response.hashes;
 
+    switch (key.symbol) {
+      case "eth":
+        key.chainId = 1;
+        key.tokens = EthereumController.defaultSupportedERC20Tokens;
+        break;
+      case "ropsten":
+        key.chainId = 3;
+        key.tokens = EthereumController.defaultSupportedTestERC20Tokens;
+        break;
+      case "tbnb":
+        key.chainId = 97;
+        key.tokens = BinanceController.defaultSupportedTestBEP20Tokens;
+        break;
+      case "bnb":
+        key.chainId = 56;
+        key.tokens = BinanceController.defaultSupportedBEP20Tokens;
+        break;
+      case "trx":
+      case "tron":
+        key.tokens = TronController.defaultSupportedTRC20Tokens;
+        break;
+      case "niles":
+        key.tokens = TronController.defaultSupportedTestTRC20Tokens;
+        break;
+      default:
+        key.tokens = [];
+        break;
+    }
+
+    await this.KeyRepository.insert(key);
     return {
       key: {
         symbol: keyData.symbol,
         nId: response.nId,
         address: response.address,
+        chainId: key.chainId,
       },
+      tokens: key.tokens,
       hashes: response.hashes,
     };
   }
@@ -69,7 +105,6 @@ export class WalletController {
   async cache(
     @Body("uuid") uuid: object
   ): Promise<{ keys: Key[]; settings: any }> {
-
     // TODO Improve security, When doing preflights monitor and match on uuid or provide otk signature
     // without that the user settings/public wallet can be exposed from brute forcing uuids
     // There is 2 types of wallet profile moving this done via social recovery and otpk pending

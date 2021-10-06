@@ -94,6 +94,11 @@ export class OtkController {
       // Unlike social recovery (wallet cache) this is direct otk so lets actually assign the wallets
       let keys;
       if (approve) {
+        // Need to change nId to the old one
+        // OR before this ADD their nId to the owner array!
+        // That maybe better with all the uuid changes
+        // we do however force nId on social so lets do that here
+
         // Get User then get user keys
         const users = await this.usersRepository.find({
           where: { uuid: req.user.pairing.uuid },
@@ -114,11 +119,14 @@ export class OtkController {
           }
         }
       }
+      // For nId
+      req.user.nId = req.user.pairing.nId;
       // clear
       req.user.pairing = null;
       await this.usersRepository.save(req.user);
 
       return {
+        nId: req.user.nId,
         keys: keys ? keys.length : 0,
       };
     } else {

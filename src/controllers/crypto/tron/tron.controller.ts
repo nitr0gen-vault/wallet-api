@@ -2,62 +2,72 @@ import { Body, Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import * as tron from "tronweb";
 import { utils } from "ethers";
-import { AuthGuard } from '../../../guards/auth.guard';
+import { AuthGuard } from "../../../guards/auth.guard";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Key } from "../../../entities/key.entity";
+import { Repository } from "typeorm";
 
 @ApiTags("Crypto / Tron")
 @Controller("tron")
 export class TronController {
-  static supportedTRC20Tokens = [
+  static defaultSupportedTestTRC20Tokens = [
     {
       name: "JUST Stablecoin",
       symbol: "USDJ",
       contract: "TLBaRhANQoJFTqre9Nf1mjuwNWjCJeYqUL",
-      decimals: 18,
+      decimal: 18,
       network: "niles",
-    },
+    }
+  ]
+    static defaultSupportedTRC20Tokens = [
     {
       name: "Wrapped TRX",
       symbol: "WTRX",
       contract: "TNUC9Qb1rRpS5CbWLmNMxXBjyFoydXjWFR",
-      decimals: 18,
+      decimal: 18,
       network: "main",
     },
     {
       name: "Wrapped BTT",
       symbol: "WBTT",
       contract: "TKfjV9RNKJJCqPvBtK8L7Knykh7DNWvnYt",
-      decimals: 18,
+      decimal: 18,
       network: "main",
     },
     {
       name: "Wrapped BTC",
       symbol: "WBTC",
       contract: "TXpw8XeWYeTUd4quDskoUqeQPowRh4jY65",
-      decimals: 18,
+      decimal: 18,
       network: "main",
     },
     {
       name: "USD Coin",
       symbol: "USDC",
       contract: "TEkxiTehnzSmSe2XqrBj4w32RUN966rdz8",
-      decimals: 18,
+      decimal: 18,
       network: "main",
     },
     {
       name: "Tether",
       symbol: "USDT",
       contract: "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t",
-      decimals: 18,
+      decimal: 18,
       network: "main",
     },
     {
       name: "JUST Stablecoin",
       symbol: "USDJ",
       contract: "TMwFHYXLJaRUPeW6421aqXL4ZEzPRFGkGT",
-      decimals: 18,
+      decimal: 18,
       network: "main",
     },
   ];
+
+  constructor(
+    @InjectRepository(Key)
+    private KeyRepository: Repository<Key>
+  ) {}
 
   private getTron(network: string, owner?: string): tron {
     let tronWeb;
@@ -158,59 +168,43 @@ export class TronController {
 
     if (whoami?.data.length) {
       const account = whoami.data[0];
-      const allTransactions = await tronWeb.fullNode.request(
-        `/v1/accounts/${address}/transactions`
-      );
+      // const allTransactions = await tronWeb.fullNode.request(
+      //   `/v1/accounts/${address}/transactions`
+      // );
 
       const response = {
         balance: account.balance,
-        txrefs: allTransactions,
+        txrefs: [],
         whoami: account.address,
         tokens: [],
       };
 
-      for (let i = TronController.supportedTRC20Tokens.length; i--; ) {
-        const trc20 = TronController.supportedTRC20Tokens[i];
-        if (trc20.network == network) {
-          response.tokens.push({
-            name: trc20.name,
-            symbol: trc20.symbol,
-            balance: await this.get20TokenBalance(
-              trc20.contract,
-              address,
-              trc20.decimals,
-              tronWeb
-            ),
-            decimals: trc20.decimals,
-            address: trc20.contract,
-            type: "trc20",
-          });
-        } else {
-          response.tokens.push({
-            name: trc20.name,
-            symbol: trc20.symbol,
-            balance: 0,
-            decimals: trc20.decimals,
-            address: trc20.contract,
-            type: "trc20",
-          });
+      const wallet = await this.KeyRepository.find({ where: { address } });
+      if (wallet.length) {
+        for (let i = wallet[0].tokens.length; i--; ) {
+          //const trc20 = TronController.defaultSupportedTRC20Tokens[i];
+          const trc20 = wallet[0].tokens[i];
+          if (trc20.network == network) {
+            response.tokens.push({
+              name: trc20.name,
+              symbol: trc20.symbol,
+              balance: await this.get20TokenBalance(
+                trc20.contract,
+                address,
+                trc20.decimal,
+                tronWeb
+              ),
+              decimal: trc20.decimal,
+              contract: trc20.contract,
+              network: trc20.network,
+            });
+          }
         }
       }
 
       return response;
     } else {
       const tokens = [];
-      for (let i = TronController.supportedTRC20Tokens.length; i--; ) {
-        const trc20 = TronController.supportedTRC20Tokens[i];
-        tokens.push({
-          name: trc20.name,
-          symbol: trc20.symbol,
-          balance: 0,
-          decimals: trc20.decimals,
-          address: trc20.contract,
-          type: "trc20",
-        });
-      }
       return {
         balance: 0,
         txrefs: [],
@@ -248,7 +242,7 @@ interface TronAddress {
   balance: number;
   whoami: any;
   txrefs: TronAddressTxRef[];
-  tokens: any[]
+  tokens: any[];
 }
 
 interface TronAddressTxRef {}

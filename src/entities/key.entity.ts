@@ -1,4 +1,4 @@
-import { Entity, ObjectID, ObjectIdColumn, Column, Index } from 'typeorm';
+import { Entity, ObjectID, ObjectIdColumn, Column, Index } from "typeorm";
 
 @Entity()
 export class Key {
@@ -11,16 +11,35 @@ export class Key {
   @Index()
   @Column()
   nId: string;
-  
+
   @Column()
   symbol: string;
 
+  @Index()
   @Column()
   address: string;
+
+  @Column()
+  chainId: number;
+
+  @Column()
+  hashes: string[];
+
+  @Column()
+  tokens: Token[];
 
   @Column()
   created: Date;
 
   @Column()
   updated: Date;
+}
+
+export interface Token {
+  decimal?: number;
+  balance?: number;
+  name: string;
+  contract: string;
+  symbol: string;
+  network: string;
 }
