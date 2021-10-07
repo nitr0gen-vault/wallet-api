@@ -118,13 +118,25 @@ export class WalletController {
 
     if (keys.length) {
       const keyData = keys[0];
+      // Test or main
+      let network;
+      switch (keyData.symbol) {
+        case "tbnb":
+        case "ropsten":
+        case "niles":
+          network = "test";
+          break;
+        default:
+          network = "main";
+      }
+
       const token: Token = {
         name: tokenData.name,
         symbol: tokenData.symbol,
         decimal: tokenData.decimal,
         contract: tokenData.address,
-        network: "main",
-      }
+        network,
+      };
       keyData.tokens.push(token);
       await this.KeyRepository.save(keyData);
       return token;
