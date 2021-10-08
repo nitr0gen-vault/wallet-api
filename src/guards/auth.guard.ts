@@ -19,6 +19,9 @@ export class AuthGuard implements CanActivate {
       if (user.length) {
         ctx.user = user[0];
         return true;
+      } else {
+        // Onboarding is allowed
+        return ctx.url === "/otk";
       }
     }
     return false;

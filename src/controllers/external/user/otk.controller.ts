@@ -12,7 +12,7 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { User } from "../../../entities/user.entity";
 import { Repository } from "typeorm";
 import { AuthGuard } from "../../../guards/auth.guard";
-import { Nitr0genService } from "../../../services/notabox/nitr0gen.service";
+import { Nitr0genService } from "../../../services/nitr0gen/nitr0gen.service";
 import { Key } from "../../../entities/key.entity";
 
 @ApiTags("One Time Key")
@@ -27,24 +27,37 @@ export class OtkController {
   ) {}
 
   @Post()
-  async onboard(@Body("ntx") ntx: any, @Body("pnt") pnt = ""): Promise<any> {
+  @UseGuards(AuthGuard)
+  async onboard(
+    @Body("ntx") ntx: any,
+    @Body("pnt") pnt = "",
+    @Request() req: any
+  ): Promise<any> {
     const nota = await this.nota.passthrough("user/onboard", ntx);
     const now = new Date();
 
-    await this.usersRepository.save(
-      this.usersRepository.create({
-        nId: nota.nId,
-        uuid: ntx.$tx.$i.otk.uuid,
-        pnt,
-        email: "",
-        telephone: "",
-        otpk: [ntx.$tx.$i.otk.publicKey],
-        lastOtpk: ntx.$tx.$i.otk.publicKey,
-        created: now,
-        updated: now,
-      })
-    );
-
+    if (req.user) {
+      req.user.nId = nota.nId;
+      // uuid should be the same as the devices was known but lost its identity
+      req.user.otpk.push(ntx.$tx.$i.otk.publicKey),
+      req.user.lastOtpk = ntx.$tx.$i.otk.publicKey,
+      req.user.updated = now;
+      await this.usersRepository.save(req.user);
+    } else {
+      await this.usersRepository.save(
+        this.usersRepository.create({
+          nId: nota.nId,
+          uuid: ntx.$tx.$i.otk.uuid,
+          pnt,
+          email: "",
+          telephone: "",
+          otpk: [ntx.$tx.$i.otk.publicKey],
+          lastOtpk: ntx.$tx.$i.otk.publicKey,
+          created: now,
+          updated: now,
+        })
+      );
+    }
     return nota;
   }
 
@@ -112,15 +125,23 @@ export class OtkController {
             for (let i = 0; i < keys.length; i++) {
               const key = keys[i];
 
+              // TODO Check for duplicates (re double pairing scenario)
+
               key.id = null;
               key.userId = req.user.id;
               await this.KeyRepository.save(key);
             }
           }
         }
+        // For nId
+        req.user.nId = req.user.pairing.nId;
+
+        // Also settings
+        req.user.email = users[0].email;
+        req.user.telephone = users[0].telephone;
+        req.user.security = users[0].security;
+        req.user.recovery = users[0].recovery;
       }
-      // For nId
-      req.user.nId = req.user.pairing.nId;
       // clear
       req.user.pairing = null;
       await this.usersRepository.save(req.user);

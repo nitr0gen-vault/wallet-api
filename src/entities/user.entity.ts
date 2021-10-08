@@ -1,4 +1,11 @@
-import { Entity, ObjectID, ObjectIdColumn, Column, Index } from 'typeorm';
+import {
+  Entity,
+  ObjectID,
+  ObjectIdColumn,
+  Column,
+  Index,
+  Unique,
+} from "typeorm";
 
 @Entity()
 export class User {
@@ -9,7 +16,7 @@ export class User {
   @Column()
   nId: string;
 
-  @Index()
+  @Index({ unique: true })
   @Column()
   uuid: string;
 
@@ -19,7 +26,7 @@ export class User {
 
   @Index()
   @Column()
-  email: string;  
+  email: string;
 
   @Column()
   recovery: string;

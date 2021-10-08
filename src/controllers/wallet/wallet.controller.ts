@@ -6,7 +6,7 @@ import {
   Body,
   UseGuards,
 } from "@nestjs/common";
-import { Nitr0genService } from "../../services/notabox/nitr0gen.service";
+import { Nitr0genService } from "../../services/nitr0gen/nitr0gen.service";
 import { ApiTags } from "@nestjs/swagger";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Key, Token } from "../../entities/key.entity";
