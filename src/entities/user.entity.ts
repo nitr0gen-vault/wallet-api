@@ -46,6 +46,17 @@ export class User {
   @Column()
   lastOtpk: string;
 
+  @Index()
+  @Column()
+  promotions: string[];
+
+  @Column()
+  promoTracking: {
+    [index:string]:{
+      history:any
+    }
+  };
+
   @Column()
   created: Date;
 

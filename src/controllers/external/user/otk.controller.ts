@@ -53,6 +53,12 @@ export class OtkController {
           telephone: "",
           otpk: [ntx.$tx.$i.otk.publicKey],
           lastOtpk: ntx.$tx.$i.otk.publicKey,
+          promotions: ["prelaunchDeposit"],
+          promoTracking: {
+            prelaunchDeposit: {
+              history:[]
+            }
+          },
           created: now,
           updated: now,
         })
