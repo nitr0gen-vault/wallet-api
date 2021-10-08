@@ -103,18 +103,14 @@ export class BinanceController {
       case "main":
         return new BscscanProvider(
           "bsc-mainnet",
-          "1WHSJ9YY13XZ9ESWJK7PFGA8QN33NJ2XVM"
+          process.env.BINANCESCAN
         );
       case "test":
         return new BscscanProvider(
           "bsc-testnet",
-          "1WHSJ9YY13XZ9ESWJK7PFGA8QN33NJ2XVM"
+          process.env.BINANCESCAN
         );
     }
-    // const provider = new providers.JsonRpcProvider(
-    //   'https://data-seed-pre-0-s1.binance.org:80',
-    //   { name: 'binance', chainId: 97 },
-    // );
   }
 
   @UseGuards(AuthGuard)

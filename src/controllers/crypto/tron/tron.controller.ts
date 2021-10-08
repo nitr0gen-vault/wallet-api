@@ -74,7 +74,11 @@ export class TronController {
     switch (network) {
       default:
       case "main":
-        throw Error("Not Implemented");
+        tronWeb = new tron({
+          fullNode: "https://api.trongrid.io",
+          solidityNode: "https://api.trongrid.io",
+          eventServer: "https://api.trongrid.io",
+        });
       case "shasta":
         tronWeb = new tron({
           fullNode: "https://api.shasta.trongrid.io",
