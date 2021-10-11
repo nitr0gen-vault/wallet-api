@@ -101,15 +101,9 @@ export class BinanceController {
     switch (network) {
       default:
       case "main":
-        return new BscscanProvider(
-          "bsc-mainnet",
-          process.env.BINANCESCAN
-        );
+        return new BscscanProvider("bsc-mainnet", process.env.BINANCESCAN);
       case "test":
-        return new BscscanProvider(
-          "bsc-testnet",
-          process.env.BINANCESCAN
-        );
+        return new BscscanProvider("bsc-testnet", process.env.BINANCESCAN);
     }
   }
 
@@ -191,6 +185,55 @@ export class BinanceController {
     return response;
   }
 
+  // TODO : Remove this repeated code
+  @UseGuards(AuthGuard)
+  @Get(":network/:address/tx")
+  async walletTx(
+    @Param("network") network: string,
+    @Param("address") address: string
+  ): Promise<{
+    balance: number;
+    txrefs: any[];
+    nonce?: number;
+  }> {
+    const provider = this.getProvider(network);
+    const balance = await provider.getBalance(address);
+    const history = await provider.getHistory(address);
+
+    const response = {
+      balance: parseInt(balance.toString()),
+      txrefs: history,
+      //txrefs: [],
+      nonce: await provider.getTransactionCount(address),
+      tokens: [],
+    };
+
+    const wallet = await this.KeyRepository.find({ where: { address } });
+    if (wallet.length && wallet[0].tokens) {
+      for (let i = wallet[0].tokens.length; i--; ) {
+        //const bep20 = BinanceController.defaultSupportedBEP20Tokens[i];
+        const bep20 = wallet[0].tokens[i];
+        if (bep20.network == network) {
+          response.tokens.push({
+            name: bep20.name,
+            symbol: bep20.symbol,
+            balance: await this.get20TokenBalance(
+              bep20.contract,
+              address,
+              provider,
+              bep20.decimal
+            ),
+            decimal: bep20.decimal,
+            contract: bep20.contract,
+            network: bep20.network,
+          });
+        }
+      }
+    }
+
+    return response;
+  }
+
   async get20TokenBalance(
     contractAddress: string,
     address: string,
@@ -203,8 +246,12 @@ export class BinanceController {
       provider
     );
 
+    try {
     const balance = await contract.balanceOf(address);
     return parseFloat(utils.formatUnits(balance, decimals));
+    }catch(e) {
+      return 0; // Need to handle that better!
+    }
   }
 }
 

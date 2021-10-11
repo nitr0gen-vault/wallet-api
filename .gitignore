@@ -1,4 +1,6 @@
 .env
+app.yaml
+.gcloudignore
 
 # compiled output
 /dist
