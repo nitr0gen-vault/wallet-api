@@ -1,11 +1,20 @@
 import { Body, Controller, Get, Param, Post, UseGuards } from "@nestjs/common";
-import { Contract, getDefaultProvider, providers, utils } from "ethers";
+import {
+  Contract,
+  getDefaultProvider,
+  providers,
+  utils,
+  ContractFactory,
+  BigNumber
+} from "ethers";
 import { BscscanProvider } from "@ethers-ancillary/bsc";
 import { ApiTags } from "@nestjs/swagger";
 import { AuthGuard } from "../../../guards/auth.guard";
 import { Key } from "../../../entities/key.entity";
 import { Repository } from "typeorm";
 import { InjectRepository } from "@nestjs/typeorm";
+import * as solc from "solc";
+import { existsSync, readFileSync } from "fs";
 
 @ApiTags("Crypto / Binance")
 @Controller("binance")
@@ -138,6 +147,89 @@ export class BinanceController {
   }
 
   @UseGuards(AuthGuard)
+  @Post(":network/bep20/create")
+  async bep20Create(
+    @Param("network") network: string,
+    @Body("contract") contract: any
+  ): Promise<unknown> {
+    const contractPath = `${__dirname}/../../../openzeppelin/token/ERC20`;
+    var input = {
+      language: "Solidity",
+      sources: {
+        "ERC20.sol": {
+          content: readFileSync(`${contractPath}/ERC20.sol`, "utf8"),
+        },
+      },
+      settings: {
+        outputSelection: {
+          "*": {
+            "*": ["*"],
+          },
+        },
+      },
+    };
+
+    function findImports(path) {
+      if (existsSync(`${contractPath}/${path}`)) {
+        return {
+          contents: readFileSync(`${contractPath}/${path}`, "utf8"),
+        };
+      }
+
+      if (existsSync(`${contractPath}/../../${path}`)) {
+        return {
+          contents: readFileSync(`${contractPath}/../../${path}`, "utf8"),
+        };
+      }
+
+      return { error: "File not found" };
+    }
+
+    // New syntax (supported from 0.5.12, mandatory from 0.6.0)
+    var output = JSON.parse(
+      solc.compile(JSON.stringify(input), { import: findImports })
+    );
+
+    const compiled = {
+      bytecode: null,
+      abi: null,
+      tx: null,
+    };
+
+    // `output` here contains the JSON output as specified in the documentation
+    for (var contractName in output.contracts["ERC20.sol"]) {
+      compiled.bytecode =
+        output.contracts["ERC20.sol"][contractName].evm.bytecode.object;
+      compiled.abi = output.contracts["ERC20.sol"][contractName].abi;
+    }
+
+    const initAsString = contract.details.initialSupply.toString();
+
+
+    const factory = new ContractFactory(compiled.abi, compiled.bytecode);
+    compiled.tx = factory.getDeployTransaction(
+      contract.details.name,
+      contract.details.symbol,
+      contract.details.decimal,
+      BigNumber.from(initAsString.padEnd(initAsString.length + 18, "0")).toHexString()
+    );
+
+    return compiled;
+  }
+
+  // @UseGuards(AuthGuard)
+  // @Post(":network/bep20/send")
+  // async bep20Send(
+  //   @Param("network") network: string,
+  //   @Body("contract") contract: any
+  // ): Promise<unknown> {
+  //   const provider = this.getProvider(network);
+  //   console.log(tx);
+
+  //   return true;
+  // }
+
+  @UseGuards(AuthGuard)
   @Get(":network/:address")
   async wallet(
     @Param("network") network: string,
@@ -247,9 +339,9 @@ export class BinanceController {
     );
 
     try {
-    const balance = await contract.balanceOf(address);
-    return parseFloat(utils.formatUnits(balance, decimals));
-    }catch(e) {
+      const balance = await contract.balanceOf(address);
+      return parseFloat(utils.formatUnits(balance, decimals));
+    } catch (e) {
       return 0; // Need to handle that better!
     }
   }

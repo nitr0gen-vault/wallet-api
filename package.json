@@ -35,7 +35,10 @@
     "@nestjs/platform-express": "^8.0.6",
     "@nestjs/swagger": "^5.0.9",
     "@nestjs/typeorm": "^8.0.2",
+    "@openzeppelin/contracts": "^4.4.0",
     "auth0": "^2.36.1",
+    "bignumber": "^1.1.0",
+    "bignumber.js": "^9.0.1",
     "ethers": "^5.4.6",
     "jwks-rsa": "^2.0.4",
     "mongodb": "3.6.4",
@@ -44,6 +47,7 @@
     "reflect-metadata": "^0.1.13",
     "rimraf": "^3.0.2",
     "rxjs": "^7.3.0",
+    "solc": "^0.8.10",
     "swagger-ui-express": "^4.1.6",
     "tronweb": "^4.0.0",
     "typeorm": "0.2.37"
