@@ -1,10 +1,12 @@
 import { Body, Controller, Post, UseGuards, Get, Param } from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Contract, providers, utils } from "ethers";
+import { BigNumber, Contract, ContractFactory, providers, utils } from "ethers";
 import { Key, Token } from "../../../entities/key.entity";
 import { Repository } from "typeorm";
 import { AuthGuard } from "../../../guards/auth.guard";
+import * as solc from "solc";
+import { existsSync, fstat, readFileSync, writeFileSync } from "fs";
 
 @ApiTags("Crypto / Etheruem")
 @Controller("ethereum")
@@ -117,6 +119,152 @@ export class EthereumController {
       medium: Math.floor(price * 1.5),
       high: Math.floor(price * 1.8),
     };
+  }
+
+  @UseGuards(AuthGuard)
+  @Post(":network/erc20/send")
+  async sendContractToNetwork(
+    @Param("network") network: string,
+    @Body("hex") tx: string,
+    @Body("source") sourceCode: any,
+    @Body("name") contractname: string
+  ): Promise<unknown> {
+    const provider = this.getProvider(network);
+
+    try {
+      const response = await provider.sendTransaction(tx);
+
+      // Send to verify sync  to return
+      (async () => {
+        const wait = await provider.waitForTransaction(response.hash);
+
+        // Add More Time
+        setTimeout(async () => {
+          const verifyResponse = await provider.fetch(
+            "contract",
+            {
+              action: "verifysourcecode",
+              codeformat: "solidity-standard-json-input",
+              compilerversion: "v0.8.10+commit.fc410830", // Get from solc?
+              contractaddress: wait.contractAddress,
+              optimizationUsed: 0,
+              contractname: "erc20.sol:" + contractname,
+              licenseType: 3,
+              sourceCode: JSON.stringify(sourceCode), // Not needed but santity check
+            },
+            true
+          );
+          console.log(JSON.stringify(verifyResponse));
+        }, 5000);
+
+        // writeFileSync("./tmp3.3.json", JSON.stringify(sourceCode));
+        // console.log({
+        //   action: "verifysourcecode",
+        //   codeformat: "solidity-standard-json-input",
+        //   compilerversion: "v0.8.10+commit.fc410830", // Get from solc?
+        //   contractaddress: wait.contractAddress,
+        //   optimizationUsed: 0,
+        //   contractname: "ERC20.sol:ERC20",
+        //   licenseType: 3,
+        //   sourceCode: sourceCode, // Not needed but santity check
+        // });
+      })();
+
+      return response;
+    } catch (e) {
+      return e;
+    }
+  }
+
+  @UseGuards(AuthGuard)
+  @Post(":network/erc20/create")
+  async bep20Create(
+    @Param("network") network: string,
+    @Body("contract") contract: any
+  ): Promise<unknown> {
+    const contractPath = `${__dirname}/../../../openzeppelin/token/ERC20`;
+    const erc20source = readFileSync(`${contractPath}/ERC20.sol`, "utf8");
+    var input = {
+      language: "Solidity",
+      sources: {
+        "ERC20.sol": {
+          content: erc20source,
+        },
+      },
+      settings: {
+        outputSelection: {
+          "*": {
+            "*": ["*"],
+          },
+        },
+      },
+    };
+
+    const varifSource = {
+      language: "Solidity",
+      sources: {
+        "ERC20.sol": {
+          content: erc20source,
+        },
+      },
+    };
+
+    function findImports(path) {
+      if (existsSync(`${contractPath}/${path}`)) {
+        const contents = readFileSync(`${contractPath}/${path}`, "utf8");
+        varifSource.sources[path] = { content: contents };
+        return {
+          contents,
+        };
+      }
+
+      if (existsSync(`${contractPath}/../../${path}`)) {
+        const contents = readFileSync(`${contractPath}/../../${path}`, "utf8");
+        varifSource.sources[path] = { content: contents };
+        return {
+          contents,
+        };
+      }
+
+      return { error: "File not found" };
+    }
+
+    // New syntax (supported from 0.5.12, mandatory from 0.6.0)
+    var output = JSON.parse(
+      solc.compile(JSON.stringify(input), { import: findImports })
+    );
+
+    const compiled = {
+      bytecode: null,
+      abi: null,
+      tx: null,
+      source: varifSource,
+    };
+
+    // `output` here contains the JSON output as specified in the documentation
+    for (var contractName in output.contracts["ERC20.sol"]) {
+      compiled.bytecode =
+        output.contracts["ERC20.sol"][contractName].evm.bytecode.object;
+      compiled.abi = output.contracts["ERC20.sol"][contractName].abi;
+    }
+
+    // writeFileSync("./tmp2", JSON.stringify(output));
+    // writeFileSync("./tmp", JSON.stringify(varifSource));
+    // writeFileSync("./tmp3", JSON.stringify(input));
+
+    const initAsString = contract.details.initialSupply.toString();
+
+    const factory = new ContractFactory(compiled.abi, compiled.bytecode);
+    compiled.tx = factory.getDeployTransaction(
+      contract.details.name,
+      contract.details.symbol,
+      contract.details.decimal,
+      BigNumber.from(
+        initAsString.padEnd(initAsString.length + 18, "0")
+      ).toHexString()
+    );
+
+    return compiled;
   }
 
   @UseGuards(AuthGuard)

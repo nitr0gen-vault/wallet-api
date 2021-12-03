@@ -5,7 +5,7 @@ import {
   providers,
   utils,
   ContractFactory,
-  BigNumber
+  BigNumber,
 } from "ethers";
 import { BscscanProvider } from "@ethers-ancillary/bsc";
 import { ApiTags } from "@nestjs/swagger";
@@ -14,7 +14,13 @@ import { Key } from "../../../entities/key.entity";
 import { Repository } from "typeorm";
 import { InjectRepository } from "@nestjs/typeorm";
 import * as solc from "solc";
-import { existsSync, readFileSync } from "fs";
+import { existsSync, fstat, readFileSync, writeFileSync } from "fs";
+import { dirname } from "path";
+//const flatten = require("truffle-flattener");
+
+interface TransactContract extends providers.TransactionResponse {
+  contractAddress?: string;
+}
 
 @ApiTags("Crypto / Binance")
 @Controller("binance")
@@ -136,10 +142,69 @@ export class BinanceController {
     @Body("hex") tx: string
   ): Promise<unknown> {
     const provider = this.getProvider(network);
-    console.log(tx);
+    //console.log(tx);
 
     try {
       const response = await provider.sendTransaction(tx);
+      return response;
+    } catch (e) {
+      return e;
+    }
+  }
+
+  @UseGuards(AuthGuard)
+  @Post(":network/bep20/send")
+  async sendContractToNetwork(
+    @Param("network") network: string,
+    @Body("hex") tx: string,
+    @Body("source") sourceCode: any,
+    @Body("name") contractname: string
+  ): Promise<TransactContract> {
+    const provider = this.getProvider(network);
+
+    try {
+      const response = await provider.sendTransaction(tx) as TransactContract;
+      response.contractAddress = (await response.wait()).contractAddress;
+
+      // Api contract verification fails on both codeformat types
+      // Send to verify sync  to return
+      // (async () => {
+      //   const wait = await provider.waitForTransaction(response.hash);
+
+      //   // Add More Time
+      //   setTimeout(async () => {
+      //     /*
+      //     const verifyResponse = await provider.fetch(
+      //       "contract",
+      //       {
+      //         action: "verifysourcecode",
+      //         codeformat: "solidity-standard-json-input",
+      //         compilerversion: "v0.8.10+commit.fc410830", // Get from solc?
+      //         contractaddress: wait.contractAddress,
+      //         optimizationUsed: 0,
+      //         contractname: "ERC20.sol:ERC20",// + contractname,
+      //         licenseType: 3,
+      //         sourceCode: JSON.stringify(sourceCode), // Not needed but santity check
+      //       },
+      //       true
+      //     );
+      //     console.log(JSON.stringify(verifyResponse));
+      //     */
+      //   }, 5000);
+
+      //   writeFileSync("./tmp3.3.json", JSON.stringify(sourceCode));
+      //   // console.log({
+      //   //   action: "verifysourcecode",
+      //   //   codeformat: "solidity-standard-json-input",
+      //   //   compilerversion: "v0.8.10+commit.fc410830", // Get from solc?
+      //   //   contractaddress: wait.contractAddress,
+      //   //   optimizationUsed: 0,
+      //   //   contractname: "ERC20.sol:ERC20",
+      //   //   licenseType: 3,
+      //   //   sourceCode: sourceCode, // Not needed but santity check
+      //   // });
+      // })();
+
       return response;
     } catch (e) {
       return e;
@@ -152,15 +217,62 @@ export class BinanceController {
     @Param("network") network: string,
     @Body("contract") contract: any
   ): Promise<unknown> {
-    const contractPath = `${__dirname}/../../../openzeppelin/token/ERC20`;
+    const contractBasePath = `${__dirname}/../solidity`;
+
+    // Work out which base contract from settings
+    // Must be a better solution possibly numerical, For now this is acceptable as it works and not oftern called
+    let contractBaseType = "default.sol";
+
+    if (contract.features.burnable) {
+      contractBaseType = "burnable.sol";
+    }
+
+    if (contract.details.totalSupply) {
+      contractBaseType = "capped.sol";
+    }
+
+    if (contract.features.burnable && contract.details.totalSupply) {
+      contractBaseType = "burncap.sol";
+    }
+
+    if (contract.features.mintable) {
+      contractBaseType = "mintable.sol";
+    }
+
+    if (contract.features.burnable && contract.features.mintable) {
+      contractBaseType = "mintburn.sol";
+    }
+
+    if (contract.features.mintable && contract.details.totalSupply) {
+      contractBaseType = "mintcap.sol";
+    }
+
+    if (
+      contract.features.burnable &&
+      contract.features.mintable &&
+      contract.details.totalSupply
+    ) {
+      contractBaseType = "mintburncap.sol";
+    }
+
+    const contractBaseFile = readFileSync(
+      `${contractBasePath}/${contractBaseType}`,
+      "utf8"
+    );
+
+    // Create standard input-output JSON for solc
     var input = {
       language: "Solidity",
       sources: {
-        "ERC20.sol": {
-          content: readFileSync(`${contractPath}/ERC20.sol`, "utf8"),
+        [contractBaseType]: {
+          content: contractBaseFile,
         },
       },
       settings: {
+        optimizer: {
+          enabled: true,
+          runs: 200,
+        },
         outputSelection: {
           "*": {
             "*": ["*"],
@@ -169,19 +281,43 @@ export class BinanceController {
       },
     };
 
-    function findImports(path) {
-      if (existsSync(`${contractPath}/${path}`)) {
+    const varifSource = {
+      language: "Solidity",
+      settings: {
+        optimizer: {
+          enabled: true,
+          runs: 200,
+        },
+      },
+      sources: {
+        [contractBaseType]: {
+          content: contractBaseFile,
+        },
+      },
+    };
+
+    function findImports(path: string) {
+      const origPath = path;
+      if (path.startsWith("opts")) {
+        path = `${contractBasePath}/${path}`;
+      } else {
+        // Openzeppelin
+        let ozPath = dirname(
+          require.resolve("@openzeppelin/contracts/package.json")
+        );
+        path = `${ozPath}/${path.replace("@openzeppelin/contracts", "")}`;
+      }
+
+      if (existsSync(path)) {
+        const contents = readFileSync(path, "utf8");
+        varifSource.sources[origPath] = { content: contents };
         return {
-          contents: readFileSync(`${contractPath}/${path}`, "utf8"),
+          contents,
         };
       }
 
-      if (existsSync(`${contractPath}/../../${path}`)) {
-        return {
-          contents: readFileSync(`${contractPath}/../../${path}`, "utf8"),
-        };
-      }
-
+      // What did we look for?
+      console.log(path);
       return { error: "File not found" };
     }
 
@@ -194,37 +330,72 @@ export class BinanceController {
       bytecode: null,
       abi: null,
       tx: null,
+      source: varifSource, // So they can submit it
     };
 
+    //writeFileSync("./tmp-source.json", JSON.stringify(varifSource));
+
     // `output` here contains the JSON output as specified in the documentation
-    for (var contractName in output.contracts["ERC20.sol"]) {
+    for (var contractName in output.contracts[contractBaseType]) {
       compiled.bytecode =
-        output.contracts["ERC20.sol"][contractName].evm.bytecode.object;
-      compiled.abi = output.contracts["ERC20.sol"][contractName].abi;
+        output.contracts[contractBaseType][contractName].evm.bytecode.object;
+      compiled.abi = output.contracts[contractBaseType][contractName].abi;
     }
 
-    const initAsString = contract.details.initialSupply.toString();
-
-
     const factory = new ContractFactory(compiled.abi, compiled.bytecode);
-    compiled.tx = factory.getDeployTransaction(
-      contract.details.name,
-      contract.details.symbol,
-      contract.details.decimal,
-      BigNumber.from(initAsString.padEnd(initAsString.length + 18, "0")).toHexString()
-    );
 
+    if (contract.details.totalSupply) {
+      compiled.tx = factory.getDeployTransaction(
+        contract.details.name,
+        contract.details.symbol,
+        contract.details.initialSupply,
+        contract.details.decimal,
+        contract.details.totalSupply
+      );
+    } else {
+      compiled.tx = factory.getDeployTransaction(
+        contract.details.name,
+        contract.details.symbol,
+        contract.details.initialSupply,
+        contract.details.decimal
+      );
+    }
     return compiled;
   }
 
   // @UseGuards(AuthGuard)
-  // @Post(":network/bep20/send")
+  // @Post(":network/bep20/verify")
   // async bep20Send(
   //   @Param("network") network: string,
   //   @Body("contract") contract: any
   // ): Promise<unknown> {
-  //   const provider = this.getProvider(network);
-  //   console.log(tx);
+  //   //const provider = this.getProvider(network);
+
+  //   const response = await ActiveRequest.send(
+  //     `https://api-testnet.bscscan.com/api`,
+  //     "POST",
+  //     [],
+  //     {
+  //       apikey: process.env.BINANCESCAN,
+  //       module: "contract",
+  //       action: "verifysourcecode",
+  //       sourcecode
+  //     }
+  //   );
+
+  //   if (response.data) {
+  //     return response.data as object;
+  //   } else {
+  //     if (response.raw) {
+  //       try {
+  //         return JSON.parse(response.raw);
+  //       } catch (e) {
+  //         throw new Error("Failed to Parse");
+  //       }
+  //     }
+  //   }
+
+  //   //https://api-testnet.bscscan.com/api
 
   //   return true;
   // }
