@@ -30,6 +30,24 @@ export class WalletController {
   ) {}
 
   @UseGuards(AuthGuard)
+  @Post("internal")
+  async internal(
+    @Body("address") address: string,
+    @Body("symbol") symbol: string,
+  ): Promise<boolean> {
+    let internal = await this.KeyRepository.find({
+      where: { symbol, address },
+    });
+
+    if(internal.length) {
+      return true;
+    }else{
+      throw Error("Unknown address");
+    }
+
+  }
+
+  @UseGuards(AuthGuard)
   @Post("open")
   async open(
     @Body("symbol") symbol: string,
