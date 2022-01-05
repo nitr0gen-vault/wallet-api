@@ -30,13 +30,71 @@ export class WalletController {
   ) {}
 
   @UseGuards(AuthGuard)
+  @Post("open")
+  async open(
+    @Body("symbol") symbol: string,
+    @Request() req: any
+  ): Promise<any> {
+    // Simulate no open keys fallback
+    // if (symbol === "ropsten") {
+    //   throw Error("No Open Keys");
+    // }
+
+    let open = await this.KeyRepository.find({
+      where: { symbol: symbol, userId: undefined },
+    });
+
+    if (open.length) {
+      // Reserve random from collision
+      const key = open[(open.length * Math.random()) | 0];
+      key.userId = req.user.id;
+      await this.KeyRepository.save(key);
+
+      return {
+        symbol,
+        nId: key.nId,
+        address: key.address,
+        hashes: key.hashes,
+        nonce: 0,
+        chainId: key.chainId,
+        tokens: key.tokens,
+      };
+    }
+    throw Error("No Open Keys");
+  }
+
+  @UseGuards(AuthGuard)
+  @Post("close")
+  async close(
+    @Body("nId") nId: string,
+    @Body("ntx") ntx: object,
+    @Request() req: any
+  ): Promise<any> {
+    let results = await this.KeyRepository.find({
+      where: { nId, userId: req.user.id },
+    });
+
+    if (results.length) {
+      // Reserve random from collision
+      //const key = results[0];
+
+      // So we know they are the reserved owner (or already attached!)
+      // Just need to forward the ntx so the ledger knows
+
+      // key/diffcon will be updated they do the same thing though
+      return await this.ntx.passthrough("keys/diffconsensus", ntx);
+    }
+    throw Error("Invalid close claim");
+  }
+
+  @UseGuards(AuthGuard)
   @Post()
-  //@Permissions('appy:create:users')
   async add(
     @Body("key")
     keyData: {
       symbol: string;
       nId: string;
+      seeded: boolean;
     },
     @Body("ntx") ntx: object,
     @Request() req: any
@@ -54,7 +112,9 @@ export class WalletController {
     key.nId = response.nId;
     key.address = response.address;
     key.created = key.updated = new Date();
-    key.userId = req.user.id;
+    if (!keyData.seeded) {
+      key.userId = req.user.id;
+    }
     key.hashes = response.hashes;
 
     switch (key.symbol) {
