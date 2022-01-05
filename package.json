@@ -7,10 +7,9 @@
   "license": "UNLICENSED",
   "main": "dist/main.js",
   "scripts": {
-    "gcp-build": "npm run build",
+    "gcp-build": "npx nest build",
     "prebuild": "rimraf dist",
-    "build:orig": "nest build",
-    "build": "tsc -p tsconfig.build.json",
+    "build": "npx nest build",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start:orig": "nest start",
     "start": "node ./dist/main.js",
