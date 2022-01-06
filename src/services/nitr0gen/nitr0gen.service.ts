@@ -47,7 +47,7 @@ export class Nitr0genService {
   public async passthrough(
     url: string,
     ntx: object
-  ): Promise<{ id: string; nId: string; address: string }> {
+  ): Promise<any> { //{ id: string; nId: string; address: string }
     const safentx = Buffer.from(JSON.stringify(ntx)).toString("base64");
     const payload = {
       ntx: safentx,

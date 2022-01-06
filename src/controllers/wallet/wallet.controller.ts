@@ -65,8 +65,15 @@ export class WalletController {
     if (open.length) {
       // Reserve random from collision
       const key = open[(open.length * Math.random()) | 0];
-      key.userId = req.user.id;
-      await this.KeyRepository.save(key);
+      key.userId = req.user._id;
+      console.log(key);
+      //this.KeyRepository.update
+      try {
+        await this.KeyRepository.update(key._id, key);
+
+      }catch(e){
+        console.log(e);
+      }
 
       return {
         symbol,
@@ -89,7 +96,7 @@ export class WalletController {
     @Request() req: any
   ): Promise<any> {
     let results = await this.KeyRepository.find({
-      where: { nId, userId: req.user.id },
+      where: { nId, userId: req.user._id },
     });
 
     if (results.length) {
@@ -131,7 +138,7 @@ export class WalletController {
     key.address = response.address;
     key.created = key.updated = new Date();
     if (!keyData.seeded) {
-      key.userId = req.user.id;
+      key.userId = req.user_id;
     }
     key.hashes = response.hashes;
 
@@ -239,7 +246,7 @@ export class WalletController {
       const user = users[0];
       // Get keys from his id
       const keys = await this.KeyRepository.find({
-        where: { userId: user.id },
+        where: { userId: user._id },
       });
       return {
         keys,

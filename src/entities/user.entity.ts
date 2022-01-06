@@ -10,7 +10,7 @@ import {
 @Entity()
 export class User {
   @ObjectIdColumn()
-  id: ObjectID;
+  _id: ObjectID;
 
   @Index()
   @Column()
@@ -52,9 +52,9 @@ export class User {
 
   @Column()
   promoTracking: {
-    [index:string]:{
-      history:any
-    }
+    [index: string]: {
+      history: any;
+    };
   };
 
   @Column()

@@ -40,8 +40,8 @@ export class OtkController {
       req.user.nId = nota.nId;
       // uuid should be the same as the devices was known but lost its identity
       req.user.otpk.push(ntx.$tx.$i.otk.publicKey),
-      req.user.lastOtpk = ntx.$tx.$i.otk.publicKey,
-      req.user.updated = now;
+        (req.user.lastOtpk = ntx.$tx.$i.otk.publicKey),
+        (req.user.updated = now);
       await this.usersRepository.save(req.user);
     } else {
       await this.usersRepository.save(
@@ -56,8 +56,8 @@ export class OtkController {
           promotions: ["prelaunchDeposit"],
           promoTracking: {
             prelaunchDeposit: {
-              history:[]
-            }
+              history: [],
+            },
           },
           created: now,
           updated: now,
@@ -124,7 +124,7 @@ export class OtkController {
         });
         if (users.length) {
           keys = await this.KeyRepository.find({
-            where: { userId: users[0].id },
+            where: { userId: users[0]._id },
           });
 
           if (keys) {
@@ -133,8 +133,8 @@ export class OtkController {
 
               // TODO Check for duplicates (re double pairing scenario)
 
-              key.id = null;
-              key.userId = req.user.id;
+              key._id = null;
+              key.userId = req.user._id;
               await this.KeyRepository.save(key);
             }
           }
@@ -200,26 +200,29 @@ export class OtkController {
   @Post("security")
   @UseGuards(AuthGuard)
   async security(@Body("ntx") ntx: any, @Request() req: any): Promise<any> {
-    const nota = await this.nota.passthrough("user/recovery", ntx);
+    const nota = (await this.nota.passthrough("user/recovery", ntx)) as any;
 
     let updated = false;
-    switch (ntx.$tx.$entry) {
-      case "update.security":
-        req.user.security = ntx.$tx.$i.otk.security;
-        updated = true;
-        break;
-      case "update.email":
-        req.user.email = ntx.$tx.$i.otk.email;
-        updated = true;
-        break;
-      case "update.recovery":
-        req.user.recovery = ntx.$tx.$i.otk.recovery;
-        updated = true;
-        break;
-      case "update.telephone":
-        req.user.telephone = ntx.$tx.$i.otk.telephone;
-        updated = true;
-        break;
+    if (nota.$streams.updated?.indexOf(ntx.$tx.$i.otk.$stram)) {
+      switch (ntx.$tx.$entry) {
+        case "update.security":
+          req.user.security = ntx.$tx.$i.otk.security;
+          updated = true;
+          break;
+        case "update.email":
+        case "update.email.save":
+          req.user.email = ntx.$tx.$i.otk.email;
+          updated = true;
+          break;
+        case "update.recovery":
+          req.user.recovery = ntx.$tx.$i.otk.recovery;
+          updated = true;
+          break;
+        case "update.telephone":
+          req.user.telephone = ntx.$tx.$i.otk.telephone;
+          updated = true;
+          break;
+      }
     }
 
     if (updated) {
