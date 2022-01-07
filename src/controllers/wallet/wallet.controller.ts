@@ -66,7 +66,7 @@ export class WalletController {
       // Reserve random from collision
       const key = open[(open.length * Math.random()) | 0];
       key.userId = req.user._id;
-      console.log(key);
+      //console.log(key);
       //this.KeyRepository.update
       try {
         await this.KeyRepository.update(key._id, key);

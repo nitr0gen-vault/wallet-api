@@ -135,7 +135,9 @@ export class OtkController {
 
               key._id = null;
               key.userId = req.user._id;
-              await this.KeyRepository.save(key);
+              // console.log("Mergeing Key ======= " + key.address);
+              // console.log(key);
+              await this.KeyRepository.insert(key);
             }
           }
         }
@@ -172,19 +174,21 @@ export class OtkController {
   ): Promise<any> {
     const nota = await this.nota.passthrough("user/recovery", ntx);
 
-    // Validate it is true not an issue if false
-    const users = await this.usersRepository.find({ where: { uuid } });
+    if (nota.$streams?.updated[0].id === ntx.$tx.$i.otk.$stream) {
+      // Validate it is true not an issue if false
+      const users = await this.usersRepository.find({ where: { uuid } });
 
-    if (users.length) {
-      const user = users[0];
+      if (users.length) {
+        const user = users[0];
 
-      // Update nId
-      user.pairing = {
-        nId: ntx.$tx.$i.otk.$stream,
-        uuid: req.user.uuid,
-      };
+        // Update nId
+        user.pairing = {
+          nId: ntx.$tx.$i.otk.$stream,
+          uuid: req.user.uuid,
+        };        
 
-      await this.usersRepository.save(user);
+        await this.usersRepository.save(user);
+      }
     }
 
     return nota;
@@ -194,6 +198,55 @@ export class OtkController {
   @UseGuards(AuthGuard)
   async recovery(@Body("ntx") ntx: any, @Request() req: any): Promise<any> {
     const nota = await this.nota.passthrough("user/recovery", ntx);
+
+    // Detect recovery phase to merge settings
+    if (
+      ntx.$tx.$entry === "recovery.validate" &&
+      nota.$streams?.updated[0].id === ntx.$tx.$o.recovery.$stream
+    ) {
+      const oldOTK = await this.usersRepository.find({
+        where: { nId: ntx.$tx.$o.recovery.$stream },
+      });
+      if (oldOTK.length) {
+        const oldUser = oldOTK[0] as User;
+        // Merge
+        req.user.security = oldUser.security;
+        req.user.email = oldUser.email;
+        req.user.recovery = oldUser.recovery;
+        req.user.telephone = oldUser.telephone;
+        console.log("updating user " + req.user._id);
+        await this.usersRepository.save(req.user);
+
+        // With a recovery we don't keep th keys so we just need to delete current and copy accross from old
+        // TODO make this and public/pending code re-usable not like this at all!
+        const newUnusedKeys = await this.KeyRepository.find({where: {userId: req.user._id}});
+        for (let i = 0; i < newUnusedKeys.length; i++) {
+          const key = newUnusedKeys[i];
+          console.log(`deleting key ${key._id}`); // probably better to not delete but also not make it empty to avoid caching ledger has it
+          await this.KeyRepository.delete(key._id);          
+        }
+
+        const keys = await this.KeyRepository.find({
+          where: { userId: oldUser._id },
+        });
+
+        if (keys) {
+          for (let i = 0; i < keys.length; i++) {
+            const key = keys[i];
+
+            // TODO Check for duplicates (re double pairing scenario)
+
+            key._id = null;
+            key.userId = req.user._id;    
+            console.log(`inserting old key to new user : ${key.address}`);
+            await this.KeyRepository.insert(key);
+          }
+        }
+
+
+      }      
+    }
+
     return nota;
   }
 
@@ -203,9 +256,11 @@ export class OtkController {
     const nota = (await this.nota.passthrough("user/recovery", ntx)) as any;
 
     let updated = false;
-    if (nota.$streams.updated?.indexOf(ntx.$tx.$i.otk.$stram)) {
+
+    if (nota.$streams?.updated[0].id === ntx.$tx.$i.otk.$stream) {
       switch (ntx.$tx.$entry) {
         case "update.security":
+        case "update.security.save":
           req.user.security = ntx.$tx.$i.otk.security;
           updated = true;
           break;
@@ -215,10 +270,12 @@ export class OtkController {
           updated = true;
           break;
         case "update.recovery":
+        case "update.recovery.save":
           req.user.recovery = ntx.$tx.$i.otk.recovery;
           updated = true;
           break;
         case "update.telephone":
+        case "update.telephone.save":
           req.user.telephone = ntx.$tx.$i.otk.telephone;
           updated = true;
           break;
