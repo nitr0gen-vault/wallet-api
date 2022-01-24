@@ -163,7 +163,7 @@ export class BinanceController {
     const provider = this.getProvider(network);
 
     try {
-      const response = await provider.sendTransaction(tx) as TransactContract;
+      const response = (await provider.sendTransaction(tx)) as TransactContract;
       response.contractAddress = (await response.wait()).contractAddress;
 
       // Api contract verification fails on both codeformat types
@@ -427,23 +427,30 @@ export class BinanceController {
       for (let i = wallet[0].tokens.length; i--; ) {
         //const bep20 = BinanceController.defaultSupportedBEP20Tokens[i];
         const bep20 = wallet[0].tokens[i];
+        bep20.balance = await this.get20TokenBalance(
+          bep20.contract,
+          address,
+          provider,
+          bep20.decimal
+        );
         if (bep20.network == network) {
           response.tokens.push({
             name: bep20.name,
             symbol: bep20.symbol,
-            balance: await this.get20TokenBalance(
-              bep20.contract,
-              address,
-              provider,
-              bep20.decimal
-            ),
+            balance: bep20.balance,
             decimal: bep20.decimal,
             contract: bep20.contract,
             network: bep20.network,
           });
         }
       }
+
+      wallet[0].balance = balance;
+      wallet[0].balanceUpdated = wallet[0].updated = new Date();
+      await this.KeyRepository.save(wallet[0]);
     }
+
+    // Lets keep a record of this data
 
     return response;
   }

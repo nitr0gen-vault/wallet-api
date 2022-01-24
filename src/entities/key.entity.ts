@@ -1,3 +1,4 @@
+import { BigNumber } from "ethers";
 import { ObjectID } from "mongodb";
 import { Entity, ObjectIdColumn, Column, Index } from "typeorm";
 
@@ -27,6 +28,15 @@ export class Key {
   hashes: string[];
 
   @Column()
+  balance?: BigNumber
+
+  @Column()
+  balanceUpdated?: Date;
+
+  @Column()
+  fragmentManager?: Fragmentation
+
+  @Column()
   tokens: Token[];
 
   @Column()
@@ -43,4 +53,17 @@ export interface Token {
   contract: string;
   symbol: string;
   network: string;
+}
+
+interface Fragmentation {
+  fragments: Fragment[];
+}
+
+interface Fragment {
+  nId: string;
+  balance: BigNumber; 
+  tx: string;
+  reason?: string;
+  permissions?: unknown;
+  owner?: String;
 }
