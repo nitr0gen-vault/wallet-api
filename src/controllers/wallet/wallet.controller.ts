@@ -33,18 +33,20 @@ export class WalletController {
   @Post("internal")
   async internal(
     @Body("address") address: string,
-    @Body("symbol") symbol: string,
-  ): Promise<boolean> {
+    @Body("symbol") symbol: string
+  ): Promise<{ address: string; internal: string }> {
     let internal = await this.KeyRepository.find({
       where: { symbol, address },
     });
 
-    if(internal.length) {
-      return true;
-    }else{
+    if (internal.length) {
+      return {
+        address: internal[0].address,
+        internal: internal[0].nId,
+      };
+    } else {
       throw Error("Unknown address");
     }
-
   }
 
   @UseGuards(AuthGuard)
@@ -70,8 +72,7 @@ export class WalletController {
       //this.KeyRepository.update
       try {
         await this.KeyRepository.update(key._id, key);
-
-      }catch(e){
+      } catch (e) {
         console.log(e);
       }
 
