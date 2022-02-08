@@ -407,6 +407,7 @@ export class BinanceController {
     @Param("address") address: string
   ): Promise<{
     balance: number;
+    partitions: any[]
     txrefs: any[];
     nonce?: number;
   }> {
@@ -417,6 +418,7 @@ export class BinanceController {
     const response = {
       balance: parseInt(balance.toString()),
       //txrefs: [history],
+      partitions: [],
       txrefs: [],
       nonce: await provider.getTransactionCount(address),
       tokens: [],
@@ -452,6 +454,7 @@ export class BinanceController {
       currentWallet.balanceUpdated = wallet[0].updated = new Date();
 
       if (currentWallet?.partitions[currentWallet.symbol]) {
+        response.partitions = currentWallet.partitions[currentWallet.symbol].subparts;
         if (currentWallet.partitioned) {
           // Use the sum as this wallet is partioned
           response.balance = parseInt(
