@@ -422,11 +422,14 @@ export class BinanceController {
       tokens: [],
     };
 
+    // move to findone
     const wallet = await this.KeyRepository.find({ where: { address } });
     if (wallet.length && wallet[0].tokens) {
-      for (let i = wallet[0].tokens.length; i--; ) {
+      const currentWallet = wallet[0];
+
+      for (let i = currentWallet.tokens.length; i--; ) {
         //const bep20 = BinanceController.defaultSupportedBEP20Tokens[i];
-        const bep20 = wallet[0].tokens[i];
+        const bep20 = currentWallet.tokens[i];
         bep20.balance = await this.get20TokenBalance(
           bep20.contract,
           address,
@@ -445,8 +448,37 @@ export class BinanceController {
         }
       }
 
-      wallet[0].balance = balance;
-      wallet[0].balanceUpdated = wallet[0].updated = new Date();
+      currentWallet.balance = balance;
+      currentWallet.balanceUpdated = wallet[0].updated = new Date();
+
+      if (currentWallet?.partitions[currentWallet.symbol]) {
+        if (currentWallet.partitioned) {
+          // Use the sum as this wallet is partioned
+          response.balance = parseInt(
+            currentWallet.partitions[currentWallet.symbol].value
+          );
+        } else {
+          // This wallet isn't partioned so add the 2 together
+          response.balance = parseInt(
+            balance
+              .add(
+                BigNumber.from(
+                  currentWallet.partitions[currentWallet.symbol].hex
+                )
+              )
+              .toString()
+          );
+        }
+      }
+
+      // Depending if partioned we need to modify the response balance
+      // we will keep balance the live full value
+      if (currentWallet.partitioned && currentWallet.partitions) {
+        response.balance = parseInt(
+          currentWallet.partitions[currentWallet.symbol].value
+        );
+      }
+
       await this.KeyRepository.save(wallet[0]);
     }
 

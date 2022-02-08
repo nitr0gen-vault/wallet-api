@@ -6,6 +6,7 @@ import {
   Body,
   UseGuards,
 } from "@nestjs/common";
+import { BigNumber } from "ethers";
 import { Nitr0genService } from "../../services/nitr0gen/nitr0gen.service";
 import { ApiTags } from "@nestjs/swagger";
 import { InjectRepository } from "@nestjs/typeorm";
@@ -276,6 +277,102 @@ export class WalletController {
   @UseGuards(AuthGuard)
   async sign(@Body("ntx") ntx: object): Promise<any> {
     return await this.ntx.passthrough("keys/sign", ntx);
+  }
+
+  @Post("gasfree")
+  @UseGuards(AuthGuard)
+  async gasfree(@Body("ntx") ntx: object): Promise<any> {
+    // keys/sign is a forwarder need to replace this
+    const result = await this.ntx.passthrough("keys/sign", ntx);
+
+    // Ledger telling us something abotu the partitions?
+    if (result.$responses) {
+      // We can assume at this point is is partional dataset
+      // Get the root key from updated
+      const rootKey = result.$streams.updated[0].id;
+      const rootKeyData = await this.KeyRepository.findOne({
+        where: { nId: rootKey },
+      });
+      if (rootKeyData) {
+        console.log(rootKeyData);
+
+        const crypto = rootKeyData.symbol;
+        const nId = rootKeyData.nId;
+
+        const partitions = result.$responses[0];
+        console.log(partitions);
+
+        // Loop the object and add the modifer into the value
+        const keys = Object.keys(partitions);
+        for (let i = 0; i < keys.length; i++) {
+          const key = partitions[keys[i]];
+          let keyData: Key;
+
+          if(keys[i] === rootKeyData.nId) {
+            keyData = rootKeyData;
+            keyData.partitioned = true;
+          }else{
+            keyData = await this.KeyRepository.findOne({
+              where: { nId: keys[i] },
+            });
+          }
+
+
+          if (keyData) {
+            //const keyData = keyData[0];
+            const keyBN = BigNumber.from(key.hex);
+            const balance = {
+              id: nId,
+              hex: key.hex,
+              value: keyBN.toString(),
+            };
+
+            if (keyData.partitions) {
+              // Need to update the total values and find the right sub!
+              const partitions = keyData.partitions[crypto];
+
+              // find if it exists
+              for (let ii = 0; ii < partitions.subparts.length; ii++) {
+                const partition = partitions.subparts[ii];
+
+                if (partition.id == nId) {
+                  // Remove value from total balance, Then add incoming
+                  const newValue = BigNumber.from(partitions.hex)
+                    .sub(BigNumber.from(partition.hex))
+                    .add(keyBN);
+
+                  // Update this
+                  partition.hex = keyBN.toHexString();
+                  partition.value = keyBN.toString();
+
+                  // Update Total
+                  partitions.hex = newValue.toHexString();
+                  partitions.value = newValue.toString();
+                }
+              }
+
+              // Now we can
+            } else {
+              // First partition build object
+              keyData.partitions = {
+                [crypto]: {
+                  hex: balance.hex,
+                  value: balance.value,
+                  subparts: [balance],
+                },
+              };
+            }
+            await this.KeyRepository.save(keyData);
+          }
+        }
+        // rootKeyData.partitioned = true;
+        // await this.KeyRepository.save(rootKeyData);
+      }
+    }
+
+    // TODO return balance results here for instant update?
+    // or does UI do balance request?
+    return result;
   }
 
   @Post("diffconsensus")

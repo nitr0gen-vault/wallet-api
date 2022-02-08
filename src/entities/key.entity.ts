@@ -28,13 +28,21 @@ export class Key {
   hashes: string[];
 
   @Column()
-  balance?: BigNumber
+  balance?: BigNumber;
 
   @Column()
   balanceUpdated?: Date;
 
   @Column()
-  fragmentManager?: Fragmentation
+  fragmentManager?: Fragmentation;
+
+  @Column({
+    default: false,
+  })
+  partitioned: boolean = false;
+
+  @Column()
+  partitions?: Partitions;
 
   @Column()
   tokens: Token[];
@@ -44,6 +52,20 @@ export class Key {
 
   @Column()
   updated: Date;
+}
+
+interface Partitions {
+  [index: string]: Partition;
+}
+
+interface Partition extends SubPartition {
+  subparts: SubPartition[];
+}
+
+interface SubPartition {
+  id?: string; //should be nid
+  hex: string;
+  value: string;
 }
 
 export interface Token {
@@ -61,7 +83,7 @@ interface Fragmentation {
 
 interface Fragment {
   nId: string;
-  balance: BigNumber; 
+  balance: BigNumber;
   tx: string;
   reason?: string;
   permissions?: unknown;
