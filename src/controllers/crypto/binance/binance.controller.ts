@@ -407,7 +407,7 @@ export class BinanceController {
     @Param("address") address: string
   ): Promise<{
     balance: number;
-    partitions: any[]
+    partitions: any[];
     txrefs: any[];
     nonce?: number;
   }> {
@@ -454,7 +454,8 @@ export class BinanceController {
       currentWallet.balanceUpdated = wallet[0].updated = new Date();
 
       if (currentWallet?.partitions[currentWallet.symbol]) {
-        response.partitions = currentWallet.partitions[currentWallet.symbol].subparts;
+        response.partitions =
+          currentWallet.partitions[currentWallet.symbol].subparts;
         if (currentWallet.partitioned) {
           // Use the sum as this wallet is partioned
           response.balance = parseInt(
@@ -498,22 +499,34 @@ export class BinanceController {
     @Param("address") address: string
   ): Promise<{
     balance: number;
-    txrefs: any[];
+    //txrefs: any[];
     nonce?: number;
   }> {
     const provider = this.getProvider(network);
-    const balance = await provider.getBalance(address);
-    const history = await provider.getHistory(address);
-
+    
     const response = {
-      balance: parseInt(balance.toString()),
-      txrefs: history,
+      balance: 0,
+      //txrefs: history,
       //txrefs: [],
       nonce: await provider.getTransactionCount(address),
       tokens: [],
     };
 
+    try {
+      response.balance = parseInt(await (await provider.getBalance(address)).toString());
+      //const history = await provider.getHistory(address);
+    } catch (e) {
+      // Rate limit hit I guess!
+    }
+
     const wallet = await this.KeyRepository.find({ where: { address } });
+
+    if (!response.balance && wallet[0].balance?._hex) {
+      // Need to fix the BigNumber / BigNumber problems in data
+      response.balance = BigNumber.from(wallet[0].balance._hex).toNumber();
+    }
+
+
     if (wallet.length && wallet[0].tokens) {
       for (let i = wallet[0].tokens.length; i--; ) {
         //const bep20 = BinanceController.defaultSupportedBEP20Tokens[i];

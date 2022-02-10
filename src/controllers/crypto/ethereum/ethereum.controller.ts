@@ -107,7 +107,6 @@ export class EthereumController {
     }
   }
 
-
   @UseGuards(AuthGuard)
   @Get(":network/fee")
   async fee(@Param("network") network: string): Promise<EthereumGasPrice> {
@@ -292,18 +291,31 @@ export class EthereumController {
     @Param("address") address: string
   ): Promise<EthereumAddress> {
     const provider = this.getProvider(network);
-    const balance = await provider.getBalance(address);
-    //const history = await provider.getHistory(address);
 
     const response = {
-      balance: parseInt(balance.toString()),
+      balance: 0,
       //txrefs: [history],
       txrefs: [],
       nonce: await provider.getTransactionCount(address),
       tokens: [] as Token[],
     };
 
+    try {
+      response.balance = parseInt(
+        await (await provider.getBalance(address)).toString()
+      );
+    } catch (e) {
+      // Rate limit hit I guess!
+    }
+    //const history = await provider.getHistory(address);
+
     const wallet = await this.KeyRepository.find({ where: { address } });
+
+    if (!response.balance && wallet[0].balance?._hex) {
+      // Need to fix the BigNumber / BigNumber problems in data
+      response.balance = BigNumber.from(wallet[0].balance._hex).toNumber();
+    }
+
     if (wallet.length && wallet[0].tokens) {
       for (let i = wallet[0].tokens.length; i--; ) {
         //const erc20 = EthereumController.defaultSupportedTestERC20Tokens[i];
@@ -335,14 +347,20 @@ export class EthereumController {
     provider: providers.EtherscanProvider,
     decimals = 18
   ): Promise<number> {
-    const contract = new Contract(
-      contractAddress,
-      EthereumController.contractAbiFragment,
-      provider
-    );
+    try {
+      const contract = new Contract(
+        contractAddress,
+        EthereumController.contractAbiFragment,
+        provider
+      );
 
-    const balance = await contract.balanceOf(address);
-    return parseFloat(utils.formatUnits(balance, decimals));
+      const balance = await contract.balanceOf(address);
+      return parseFloat(utils.formatUnits(balance, decimals));
+    } catch (e) {
+      // Should take from the database but this will also change with partitions!
+      // Ultimetly I think we should check balances in the background (or use difference keys)
+      return 0;
+    }
   }
 }
 
