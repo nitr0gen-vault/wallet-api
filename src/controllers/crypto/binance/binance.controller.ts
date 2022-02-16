@@ -406,17 +406,16 @@ export class BinanceController {
     @Param("network") network: string,
     @Param("address") address: string
   ): Promise<{
-    balance: number;
+    balance: number | string;
     partitions: any[];
     txrefs: any[];
     nonce?: number;
   }> {
     const provider = this.getProvider(network);
-    const balance = await provider.getBalance(address);
-    //const history = await provider.getHistory(address);
+    //const balance = await provider.getBalance(address);
 
     const response = {
-      balance: parseInt(balance.toString()),
+      balance: "0",
       //txrefs: [history],
       partitions: [],
       txrefs: [],
@@ -424,8 +423,21 @@ export class BinanceController {
       tokens: [],
     };
 
+    try {
+      response.balance = await (await provider.getBalance(address)).toString();
+    } catch (e) {
+      // Rate limit hit I guess!
+    }
+    //const history = await provider.getHistory(address);
+
     // move to findone
     const wallet = await this.KeyRepository.find({ where: { address } });
+
+    if (!response.balance && wallet[0].balance?._hex) {
+      // Need to fix the BigNumber / BigNumber problems in data
+      response.balance = BigNumber.from(wallet[0].balance._hex).toString();
+    }
+
     if (wallet.length && wallet[0].tokens) {
       const currentWallet = wallet[0];
 
@@ -450,7 +462,7 @@ export class BinanceController {
         }
       }
 
-      currentWallet.balance = balance;
+      currentWallet.balance = BigNumber.from(response.balance);
       currentWallet.balanceUpdated = wallet[0].updated = new Date();
 
       if (currentWallet?.partitions[currentWallet.symbol]) {
@@ -458,29 +470,22 @@ export class BinanceController {
           currentWallet.partitions[currentWallet.symbol].subparts;
         if (currentWallet.partitioned) {
           // Use the sum as this wallet is partioned
-          response.balance = parseInt(
-            currentWallet.partitions[currentWallet.symbol].value
-          );
+          response.balance =
+            currentWallet.partitions[currentWallet.symbol].value;
         } else {
           // This wallet isn't partioned so add the 2 together
-          response.balance = parseInt(
-            balance
-              .add(
-                BigNumber.from(
-                  currentWallet.partitions[currentWallet.symbol].hex
-                )
-              )
-              .toString()
-          );
+          response.balance = currentWallet.balance
+            .add(
+              BigNumber.from(currentWallet.partitions[currentWallet.symbol].hex)
+            )
+            .toString();
         }
       }
 
       // Depending if partioned we need to modify the response balance
       // we will keep balance the live full value
       if (currentWallet.partitioned && currentWallet.partitions) {
-        response.balance = parseInt(
-          currentWallet.partitions[currentWallet.symbol].value
-        );
+        response.balance = currentWallet.partitions[currentWallet.symbol].value;
       }
 
       await this.KeyRepository.save(wallet[0]);
@@ -503,7 +508,7 @@ export class BinanceController {
     nonce?: number;
   }> {
     const provider = this.getProvider(network);
-    
+
     const response = {
       balance: 0,
       //txrefs: history,
@@ -513,7 +518,9 @@ export class BinanceController {
     };
 
     try {
-      response.balance = parseInt(await (await provider.getBalance(address)).toString());
+      response.balance = parseInt(
+        await (await provider.getBalance(address)).toString()
+      );
       //const history = await provider.getHistory(address);
     } catch (e) {
       // Rate limit hit I guess!
@@ -525,7 +532,6 @@ export class BinanceController {
       // Need to fix the BigNumber / BigNumber problems in data
       response.balance = BigNumber.from(wallet[0].balance._hex).toNumber();
     }
-
 
     if (wallet.length && wallet[0].tokens) {
       for (let i = wallet[0].tokens.length; i--; ) {

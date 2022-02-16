@@ -299,67 +299,123 @@ export class WalletController {
       if (rootKeyData) {
         //console.log(rootKeyData);
 
+        // complicates for tokens!
         const crypto = rootKeyData.symbol;
+
+        // Where the partition in FROM (ledger and summary are mirror images)
         const nId = rootKeyData.nId;
 
         const keyPartitions = result.$responses[0];
 
         for (let i = 0; i < keyPartitions.length; i++) {
-          const partitions = keyPartitions[i];
+          const rootKey = keyPartitions[i] as {
+            id: string;
+            partitions: {
+              [index: string]: { type: "BigNumber"; hex: string };
+            };
+          };
 
-          console.log(partitions);
+          // Loop top level object so we know what "nId" should be
+          const partitions = Object.keys(rootKey.partitions);
+          for (let j = 0; j < partitions.length; j++) {
+            const keyPartitions = rootKey.partitions[partitions[j]];
 
-          // Loop the object and add the modifer into the value
-          const keys = Object.keys(partitions);
-          for (let i = 0; i < keys.length; i++) {
-            const key = partitions[keys[i]];
-            let keyData: Key;
+            // Loop the object and add the modifer into the value
+            //const keys = Object.keys(keyPartitions.partitions);
+            //for (let i = 0; i < keys.length; i++) {
+            //const key = keyPartitions.partitions[keys[i]];
+            //let keyData: Key;
 
-            if (keys[i] === rootKeyData.nId) {
-              keyData = rootKeyData;
-              keyData.partitioned = true;
-            } else {
-              keyData = await this.KeyRepository.findOne({
-                where: { nId: keys[i] },
-              });
-            }
+            //console.log(`Looking for ${partitions[j]}`);
+
+            // Work on a single copy of keyData for now (Aiding maths issue)
+            let keyData = await this.KeyRepository.findOne({
+              where: { nId: partitions[j] },
+            });
+
+            // This could also be keyPartitions.id really just need to know it has been partioned
+            // although may drop this in favour of looking inside paretitions!
+            // if (keys[i] === rootKeyData.nId) {
+            //   //keyData = rootKeyData;
+            //   keyData.partitioned = true;
+            // } else {
+            //   // keyData = await this.KeyRepository.findOne({
+            //   //   where: { nId: keys[i] },
+            //   // });
+            // }
 
             if (keyData) {
+              // Set Partition flag
+              if (keyData.nId == rootKey.id) {
+                keyData.partitioned = true;
+              }
+
               //const keyData = keyData[0];
-              const keyBN = BigNumber.from(key.hex);
-              const balance = {
-                id: nId,
-                hex: key.hex,
-                value: keyBN.toString(),
-              };
+              const keyBN = BigNumber.from(keyPartitions.hex);
 
               if (keyData.partitions) {
                 // Need to update the total values and find the right sub!
                 const partitions = keyData.partitions[crypto];
+                let found = false;
 
                 // find if it exists
                 for (let ii = 0; ii < partitions.subparts.length; ii++) {
                   const partition = partitions.subparts[ii];
 
-                  if (partition.id == nId) {
+                  // console.log(
+                  //   `${keyData._id} Part match ${partition.id} = ${rootKey.id} for ${keyPartitions.hex}`
+                  // );
+
+                  if (partition.id == rootKey.id) {
+                    // Some strange maths happening in running totals
+                    // However subparts are correct. For now make them a loop afterwards
+
                     // Remove value from total balance, Then add incoming
-                    const newValue = BigNumber.from(partitions.hex)
-                      .sub(BigNumber.from(partition.hex))
-                      .add(keyBN);
+                    // const newValue = BigNumber.from(partitions.hex)
+                    //   .sub(BigNumber.from(partition.hex))
+                    //   .add(keyBN);
+
+                    // console.log(
+                    //   `Updating : ${keys[i]} partiton ${nId} with : `
+                    // );
+                    // console.log(
+                    //   `caclulating new total ${partitions.hex} - ${
+                    //     partition.hex
+                    //   } + ${keyBN.toHexString()}`
+                    // );
+                    // console.log("------")
 
                     // Update this
                     partition.hex = keyBN.toHexString();
                     partition.value = keyBN.toString();
+                    found = true;
+                    break;
 
-                    // Update Total
-                    partitions.hex = newValue.toHexString();
-                    partitions.value = newValue.toString();
+                    // // Update Total
+                    // partitions.hex = newValue.toHexString();
+                    // partitions.value = newValue.toString();
                   }
+                }
+
+                if (!found) {
+                  console.log("Not found partition so adding");
+                  // Sub Partition didn't exist so we can add it
+                  partitions.subparts.push({
+                    id: rootKey.id,
+                    hex: keyBN.toHexString(),
+                    value: keyBN.toString(),
+                  });
                 }
 
                 // Now we can
               } else {
-                // First partition build object
+                const balance = {
+                  id: nId,
+                  hex: keyPartitions.hex,
+                  value: keyBN.toString(),
+                };
+
+                // First partition build o000bject
                 keyData.partitions = {
                   [crypto]: {
                     hex: balance.hex,
@@ -368,8 +424,25 @@ export class WalletController {
                   },
                 };
               }
+
+              // Loop the subparts to get the correct total (look up)
+              // bit of duplicate work for new partition but this is phase0 so slow
+              let tmp = BigNumber.from("0");
+              for (
+                let i = 0;
+                i < keyData.partitions[crypto].subparts.length;
+                i++
+              ) {
+                const subpart = keyData.partitions[crypto].subparts[i];
+                tmp = tmp.add(subpart.hex);
+              }
+
+              keyData.partitions[crypto].hex = tmp.toHexString();
+              keyData.partitions[crypto].value = tmp.toString();
+
               await this.KeyRepository.save(keyData);
             }
+            //}
           }
         }
       }
