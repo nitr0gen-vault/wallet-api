@@ -465,7 +465,13 @@ export class BinanceController {
       currentWallet.balance = BigNumber.from(response.balance);
       currentWallet.balanceUpdated = wallet[0].updated = new Date();
 
-      if (currentWallet?.partitions[currentWallet.symbol]) {
+      //console.log(currentWallet);
+
+      //also has partitioned as a bool
+      if (
+        currentWallet.partitions &&
+        currentWallet.partitions[currentWallet.symbol]
+      ) {
         response.partitions =
           currentWallet.partitions[currentWallet.symbol].subparts;
         if (currentWallet.partitioned) {

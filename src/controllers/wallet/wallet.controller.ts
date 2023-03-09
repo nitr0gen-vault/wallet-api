@@ -140,9 +140,10 @@ export class WalletController {
     key.address = response.address;
     key.created = key.updated = new Date();
     if (!keyData.seeded) {
-      key.userId = req.user_id;
+      key.userId = req.user._id;
     }
     key.hashes = response.hashes;
+
 
     switch (key.symbol) {
       case "eth":

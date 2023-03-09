@@ -22,7 +22,10 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "deploy": "gcloud --project nitr0gen app deploy"
+    "deploy": "gcloud --project nitr0gen app deploy",
+    "predeploy:testnet": "npx ts-node deployments/deploy.ts prepare test",
+    "deploy:testnet": "gcloud --project nitr0gen app deploy ./app-test.yaml",
+    "postdeploy:testnet": "npx ts-node deployments/deploy.ts post test"
   },
   "dependencies": {
     "@activeledger/activeutilities": "^2.6.3",
